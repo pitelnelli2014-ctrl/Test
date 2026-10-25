@@ -203,9 +203,9 @@ function makePost(x, z) {
 
 // ===== Конфиги =====
 const ROBOT_CONFIGS = {
-  atom:  { name:'АТОМ',      hp:130, speed:0.24, damage:9,  scale:0.9,  model:'atom.glb'  },
-  zeus:  { name:'ЗЕВС',      hp:180, speed:0.14, damage:16, scale:1.35, model:'zeus.glb'  },
-  noisy: { name:'НОЙЗИ БОЙ', hp:110, speed:0.20, damage:11, scale:1.05, model:'noisy.glb' }
+  atom:  { name:'АТОМ',      hp:130, speed:0.24, damage:9,  scale:0.9,  model:'models/atom.glb'  },
+  zeus:  { name:'ЗЕВС',      hp:180, speed:0.14, damage:16, scale:1.35, model:'models/zeus.glb'  },
+  noisy: { name:'НОЙЗИ БОЙ', hp:110, speed:0.20, damage:11, scale:1.05, model:'models/noisy.glb' }
 };
 
 // ===== Загрузка GLB =====
@@ -226,7 +226,6 @@ function loadModel(config, position, rotY, onDone) {
     undefined,
     (err) => {
       console.warn('Не удалось загрузить модель, использую заглушку:', config.model, err);
-      // Заглушка-куб, если файла нет
       const geo = new THREE.BoxGeometry(1.4, 3, 1.4);
       const mat = new THREE.MeshStandardMaterial({ color: 0x66ccff, metalness: 0.9, roughness: 0.3 });
       const box = new THREE.Mesh(geo, mat);
@@ -287,7 +286,6 @@ function startGame(playerType) {
   document.getElementById('selectScreen').style.display = 'none';
   msg.style.display = 'none';
 
-  // Загружаем обе модели параллельно
   const posP = new THREE.Vector3(-6, 0, 4);
   const posE = new THREE.Vector3(6, 0, -4);
 
@@ -371,13 +369,11 @@ function distance(a, b) {
   return Math.sqrt(dx*dx + dz*dz);
 }
 
-// Для GLB-моделей анимация удара — лёгкий рывок вперёд
 function animatePunch(robot, timer) {
   if (!robot) return;
   const t = Math.sin(timer * Math.PI / 12);
   robot.position.z += 0.08 * t;
 }
-function resetArm(robot) { /* для GLB ничего не сбрасываем */ }
 
 function update() {
   if (!state.started || state.over || !player || !enemy) return;
@@ -456,4 +452,4 @@ addEventListener('resize', () => {
 });
 </script>
 </body>
-</html>
+</html>  
