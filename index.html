@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Real Steel 3D — GitHub</title>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; overflow: hidden;
+    background: #111; font-family: monospace;
+    width: 100vw; height: 100vh;
+    touch-action: none; user-select: none;
+  }
+  canvas { display: block; }
+  #selectScreen {
+    position: fixed; inset: 0; background: rgba(10,10,18,0.97);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 100; padding: 20px; text-align: center;
+  }
+  #selectScreen h1 { color: #f1c40f; font-size: 22px; margin-bottom: 8px; text-shadow: 0 0 15px #000; }
+  #selectScreen p { color: #aaa; font-size: 13px; margin-bottom: 25px; }
+  .robot-choices { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .robot-card {
+    width: 100px; padding: 14px 8px; border-radius: 12px;
+    border: 2px solid #555; background: #1e1e2a;
+    color: #fff; cursor: pointer; transition: 0.15s;
+  }
+  .robot-card:active { transform: scale(0.95); }
+  .robot-card .icon { font-size: 32px; margin-bottom: 6px; }
+  .robot-card .name { font-size: 14px; font-weight: bold; }
+  .robot-card .desc { font-size: 10px; color: #999; margin-top: 4px; }
+  .atom-card  { border-color: #66ccff; }
+  .zeus-card  { border-color: #33ff88; }
+  .noisy-card { border-color: #cc66ff; }
+  #hud {
+    position: fixed; top: 0; left: 0; width: 100%; padding: 8px 10px;
+    display: flex; justify-content: space-between; gap: 10px;
+    pointer-events: none; z-index: 10;
+  }
+  .bar-wrap { flex: 1; }
+  .bar { height: 14px; background: #222; border: 2px solid #555; border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; width: 100%; transition: width 0.15s; }
+  #playerBar .bar-fill { background: linear-gradient(90deg,#3a7bd5,#66ccff); }
+  #enemyBar  .bar-fill { background: linear-gradient(90deg,#ff5533,#c0392b); float: right; }
+  .label { color: #ccc; font-size: 10px; margin-bottom: 2px; }
+  #msg {
+    position: fixed; top: 40%; width: 100%; text-align: center;
+    color: #f1c40f; font-size: 30px; display: none;
+    text-shadow: 0 0 20px #000; pointer-events: none; z-index: 20;
+    padding: 0 20px;
+  }
+  #joyZone {
+    position: fixed; left: 15px; bottom: 20px;
+    width: 120px; height: 120px; z-index: 15;
+  }
+  #joyBase {
+    position: absolute; inset: 0; border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    border: 2px solid rgba(255,255,255,0.25);
+  }
+  #joyKnob {
+    position: absolute; left: 50%; top: 50%;
+    width: 50px; height: 50px; margin: -25px 0 0 -25px;
+    border-radius: 50%;
+    background: rgba(58,123,213,0.85);
+    border: 2px solid rgba(102,204,255,0.9);
+    box-shadow: 0 0 15px rgba(102,204,255,0.6);
+  }
+  #punchBtn {
+    position: fixed; right: 20px; bottom: 30px;
+    width: 100px; height: 100px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #ff7755, #c0392b);
+    border: 3px solid #ff9988;
+    color: #fff; font-size: 14px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 25px rgba(255,80,50,0.6);
+    z-index: 15; touch-action: none;
+  }
+  #punchBtn:active { transform: scale(0.9); box-shadow: 0 0 40px rgba(255,80,50,1); }
+  #resetBtn {
+    position: fixed; right: 20px; top: 55px;
+    width: 45px; height: 45px; border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    border: 2px solid rgba(255,255,255,0.3);
+    color: #fff; font-size: 22px;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 15; touch-action: none;
+  }
+</style>
+</head>
+<body>
+<div id="selectScreen">
+  <h1>ВЫБЕРИ РОБОТА</h1>
+  <p>Противник — случайный из оставшихся</p>
+  <div class="robot-choices">
+    <div class="robot-card atom-card" data-robot="atom">
+      <div class="icon">🤖</div>
+      <div class="name">АТОМ</div>
+      <div class="desc">Быстрый · Живучий</div>
+    </div>
+    <div class="robot-card zeus-card" data-robot="zeus">
+      <div class="icon">⚡</div>
+      <div class="name">ЗЕВС</div>
+      <div class="desc">Мощный · Танк</div>
+    </div>
+    <div class="robot-card noisy-card" data-robot="noisy">
+      <div class="icon">🎌</div>
+      <div class="name">НОЙЗИ БОЙ</div>
+      <div class="desc">Сбалансированный</div>
+    </div>
+  </div>
+</div>
+
+<div id="hud">
+  <div class="bar-wrap" id="playerBar">
+    <div class="label" id="playerNameLabel">ТЫ</div>
+    <div class="bar"><div class="bar-fill"></div></div>
+  </div>
+  <div class="bar-wrap" id="enemyBar">
+    <div class="label" id="enemyNameLabel" style="text-align:right">ВРАГ</div>
+    <div class="bar"><div class="bar-fill"></div></div>
+  </div>
+</div>
+
+<div id="msg"></div>
+
+<div id="joyZone">
+  <div id="joyBase"></div>
+  <div id="joyKnob"></div>
+</div>
+
+<div id="punchBtn">УДАР</div>
+<div id="resetBtn">⟳</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// ===== Сцена =====
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a12);
+scene.fog = new THREE.Fog(0x0a0a12, 25, 70);
+
+const camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 0.1, 200);
+camera.position.set(0, 14, 26);
+camera.lookAt(0, 4, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// ===== Свет =====
+scene.add(new THREE.HemisphereLight(0x8899bb, 0x111111, 0.5));
+const spot = new THREE.SpotLight(0xffffff, 3, 100, Math.PI/4, 0.5, 1);
+spot.position.set(0, 34, 6);
+spot.castShadow = true;
+spot.shadow.mapSize.set(2048, 2048);
+scene.add(spot);
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
+keyLight.position.set(8, 20, 10);
+scene.add(keyLight);
+const rimBlue = new THREE.PointLight(0x3a7bd5, 2, 50); rimBlue.position.set(-12, 8, -6); scene.add(rimBlue);
+const rimRed  = new THREE.PointLight(0xff4433, 1.5, 50); rimRed.position.set(12, 8, -6); scene.add(rimRed);
+
+// ===== Арена =====
+const floorMat = new THREE.MeshStandardMaterial({ color: 0x22222a, roughness: 0.9, metalness: 0.1 });
+const floor = new THREE.Mesh(new THREE.BoxGeometry(26, 0.5, 20), floorMat);
+floor.position.y = -0.25; floor.receiveShadow = true; scene.add(floor);
+const grid = new THREE.GridHelper(26, 26, 0x3a3a55, 0x1a1a28);
+grid.position.y = 0.01; scene.add(grid);
+
+function makeRope(y) {
+  const mat = new THREE.MeshStandardMaterial({ color: 0x777788, metalness: 0.9, roughness: 0.2 });
+  const geo = new THREE.CylinderGeometry(0.09, 0.09, 26, 10);
+  geo.rotateZ(Math.PI/2);
+  const r1 = new THREE.Mesh(geo, mat); r1.position.set(0, y, -10); scene.add(r1);
+  const r2 = r1.clone(); r2.position.z = 10; scene.add(r2);
+}
+[1.5, 2.8, 4].forEach(makeRope);
+
+function makePost(x, z) {
+  const geo = new THREE.CylinderGeometry(0.3, 0.3, 5, 16);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x444455, metalness: 0.9, roughness: 0.25 });
+  const p = new THREE.Mesh(geo, mat); p.position.set(x, 2.5, z); p.castShadow = true; scene.add(p);
+  const capGeo = new THREE.SphereGeometry(0.35, 16, 12);
+  const cap = new THREE.Mesh(capGeo, mat); cap.position.set(x, 5, z); scene.add(cap);
+}
+[[-12,-9],[12,-9],[-12,9],[12,9]].forEach(([x,z]) => makePost(x,z));
+
+// ===== Конфиги =====
+const ROBOT_CONFIGS = {
+  atom:  { name:'АТОМ',      hp:130, speed:0.24, damage:9,  scale:0.9,  model:'atom.glb'  },
+  zeus:  { name:'ЗЕВС',      hp:180, speed:0.14, damage:16, scale:1.35, model:'zeus.glb'  },
+  noisy: { name:'НОЙЗИ БОЙ', hp:110, speed:0.20, damage:11, scale:1.05, model:'noisy.glb' }
+};
+
+// ===== Загрузка GLB =====
+const loader = new GLTFLoader();
+function loadModel(config, position, rotY, onDone) {
+  loader.load(
+    config.model,
+    (gltf) => {
+      const obj = gltf.scene;
+      obj.position.copy(position);
+      obj.rotation.y = rotY;
+      obj.scale.setScalar(config.scale);
+      obj.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+      scene.add(obj);
+      obj.userData = { config, armR: null, fistR: null };
+      onDone(obj);
+    },
+    undefined,
+    (err) => {
+      console.warn('Не удалось загрузить модель, использую заглушку:', config.model, err);
+      // Заглушка-куб, если файла нет
+      const geo = new THREE.BoxGeometry(1.4, 3, 1.4);
+      const mat = new THREE.MeshStandardMaterial({ color: 0x66ccff, metalness: 0.9, roughness: 0.3 });
+      const box = new THREE.Mesh(geo, mat);
+      box.position.copy(position); box.position.y = 1.5;
+      box.castShadow = true;
+      scene.add(box);
+      box.userData = { config, armR: null, fistR: null };
+      onDone(box);
+    }
+  );
+}
+let player, enemy;
+let playerConfig, enemyConfig;
+const state = {
+  playerHp: 100, enemyHp: 100,
+  playerPunch: 0, enemyPunch: 0,
+  playerCooldown: 0, enemyCooldown: 0,
+  over: false, started: false
+};
+
+const playerFill = document.querySelector('#playerBar .bar-fill');
+const enemyFill  = document.querySelector('#enemyBar .bar-fill');
+const playerNameLabel = document.getElementById('playerNameLabel');
+const enemyNameLabel  = document.getElementById('enemyNameLabel');
+const msg = document.getElementById('msg');
+
+function updateHUD() {
+  if (playerConfig) playerFill.style.width = Math.max(0, state.playerHp) + '%';
+  if (enemyConfig)  enemyFill.style.width  = Math.max(0, state.enemyHp)  + '%';
+}
+function showMsg(text, color) {
+  msg.textContent = text; msg.style.color = color; msg.style.display = 'block';
+}
+
+document.querySelectorAll('.robot-card').forEach(card => {
+  card.addEventListener('click', () => startGame(card.dataset.robot));
+});
+
+function startGame(playerType) {
+  if (player) scene.remove(player);
+  if (enemy) scene.remove(enemy);
+  player = enemy = null;
+
+  const types = ['atom', 'zeus', 'noisy'].filter(t => t !== playerType);
+  const enemyType = types[Math.floor(Math.random() * types.length)];
+  playerConfig = ROBOT_CONFIGS[playerType];
+  enemyConfig  = ROBOT_CONFIGS[enemyType];
+
+  state.playerHp = playerConfig.hp;
+  state.enemyHp = enemyConfig.hp;
+  state.playerPunch = 0; state.enemyPunch = 0;
+  state.playerCooldown = 0; state.enemyCooldown = 0;
+  state.over = false; state.started = false;
+
+  playerNameLabel.textContent = 'ТЫ: ' + playerConfig.name;
+  enemyNameLabel.textContent = enemyConfig.name;
+  updateHUD();
+  document.getElementById('selectScreen').style.display = 'none';
+  msg.style.display = 'none';
+
+  // Загружаем обе модели параллельно
+  const posP = new THREE.Vector3(-6, 0, 4);
+  const posE = new THREE.Vector3(6, 0, -4);
+
+  let loaded = 0;
+  const onBoth = () => { if (++loaded === 2) state.started = true; };
+
+  loadModel(playerConfig, posP, 0, (obj) => { player = obj; onBoth(); });
+  loadModel(enemyConfig,  posE, Math.PI, (obj) => { enemy = obj; onBoth(); });
+}
+
+// ===== Джойстик =====
+let joyInput = { x: 0, y: 0 };
+const joyZone = document.getElementById('joyZone');
+const joyKnob = document.getElementById('joyKnob');
+let joyActive = false, joyTouchId = null;
+const JOY_RADIUS = 45;
+
+function onJoyStart(e) {
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  joyTouchId = t.identifier; joyActive = true;
+  updateJoy(t);
+}
+function onJoyMove(e) {
+  if (!joyActive) return;
+  for (const t of e.changedTouches) {
+    if (t.identifier === joyTouchId) { updateJoy(t); break; }
+  }
+}
+function onJoyEnd(e) {
+  for (const t of e.changedTouches) {
+    if (t.identifier === joyTouchId) {
+      joyActive = false; joyTouchId = null;
+      joyInput.x = 0; joyInput.y = 0;
+      joyKnob.style.transform = 'translate(0,0)';
+      break;
+    }
+  }
+}
+function updateJoy(t) {
+  const rect = joyZone.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  let dx = t.clientX - cx;
+  let dy = t.clientY - cy;
+  const dist = Math.hypot(dx, dy);
+  if (dist > JOY_RADIUS) { dx = dx / dist * JOY_RADIUS; dy = dy / dist * JOY_RADIUS; }
+  joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+  joyInput.x = dx / JOY_RADIUS;
+  joyInput.y = dy / JOY_RADIUS;
+}
+joyZone.addEventListener('touchstart', onJoyStart, { passive: false });
+joyZone.addEventListener('touchmove',  onJoyMove,  { passive: false });
+joyZone.addEventListener('touchend',   onJoyEnd);
+joyZone.addEventListener('touchcancel',onJoyEnd);
+
+// ===== Кнопка удара =====
+let punchPressed = false;
+const punchBtn = document.getElementById('punchBtn');
+punchBtn.addEventListener('touchstart', e => { e.preventDefault(); punchPressed = true; }, { passive: false });
+punchBtn.addEventListener('touchend',   e => { e.preventDefault(); punchPressed = false; }, { passive: false });
+punchBtn.addEventListener('touchcancel',() => punchPressed = false);
+
+// ===== Рестарт =====
+document.getElementById('resetBtn').addEventListener('touchstart', e => {
+  e.preventDefault();
+  document.getElementById('selectScreen').style.display = 'flex';
+  state.started = false;
+  msg.style.display = 'none';
+  if (player) { scene.remove(player); player = null; }
+  if (enemy)  { scene.remove(enemy);  enemy = null; }
+}, { passive: false });
+function faceTarget(obj, target) {
+  const dx = target.position.x - obj.position.x;
+  const dz = target.position.z - obj.position.z;
+  obj.rotation.y = Math.atan2(dx, dz);
+}
+function distance(a, b) {
+  const dx = a.position.x - b.position.x;
+  const dz = a.position.z - b.position.z;
+  return Math.sqrt(dx*dx + dz*dz);
+}
+
+// Для GLB-моделей анимация удара — лёгкий рывок вперёд
+function animatePunch(robot, timer) {
+  if (!robot) return;
+  const t = Math.sin(timer * Math.PI / 12);
+  robot.position.z += 0.08 * t;
+}
+function resetArm(robot) { /* для GLB ничего не сбрасываем */ }
+
+function update() {
+  if (!state.started || state.over || !player || !enemy) return;
+  const pCfg = player.userData.config;
+  const eCfg = enemy.userData.config;
+
+  if (joyInput.x !== 0 || joyInput.y !== 0) {
+    player.position.x += joyInput.x * pCfg.speed;
+    player.position.z += joyInput.y * pCfg.speed;
+    player.position.x = Math.max(-11, Math.min(11, player.position.x));
+    player.position.z = Math.max(-8,  Math.min(8,  player.position.z));
+  }
+  faceTarget(player, enemy);
+
+  if (state.playerCooldown > 0) state.playerCooldown--;
+  if (state.playerPunch > 0) state.playerPunch--;
+
+  if (punchPressed && state.playerCooldown <= 0 && state.playerPunch <= 0) {
+    state.playerPunch = 12;
+    state.playerCooldown = 30;
+    const reach = 3.2 + pCfg.scale;
+    if (distance(player, enemy) < reach) {
+      state.enemyHp -= pCfg.damage;
+      updateHUD();
+      if (state.enemyHp <= 0) endGame(true);
+    }
+  }
+
+  if (state.enemyCooldown > 0) state.enemyCooldown--;
+  if (state.enemyPunch > 0) state.enemyPunch--;
+
+  const d = distance(player, enemy);
+  const enemyReach = 2.8 + eCfg.scale;
+  if (d > enemyReach) {
+    const dx = player.position.x - enemy.position.x;
+    const dz = player.position.z - enemy.position.z;
+    const len = Math.hypot(dx, dz);
+    enemy.position.x += (dx/len) * eCfg.speed * 0.4;
+    enemy.position.z += (dz/len) * eCfg.speed * 0.4;
+  } else if (state.enemyCooldown <= 0) {
+    state.enemyPunch = 12;
+    state.enemyCooldown = 55 - (eCfg.speed * 100);
+    state.playerHp -= eCfg.damage;
+    updateHUD();
+    if (state.playerHp <= 0) endGame(false);
+  }
+  faceTarget(enemy, player);
+
+  if (state.playerPunch > 0) animatePunch(player, state.playerPunch);
+  if (state.enemyPunch > 0)  animatePunch(enemy,  state.enemyPunch);
+
+  const midX = (player.position.x + enemy.position.x) / 2;
+  const midZ = (player.position.z + enemy.position.z) / 2;
+  camera.position.x += (midX - camera.position.x) * 0.05;
+  camera.position.z += (midZ + 24 - camera.position.z) * 0.05;
+  camera.lookAt(midX, 4, midZ);
+}
+
+function endGame(playerWon) {
+  state.over = true;
+  if (playerWon) showMsg('ПОБЕДА!', '#f1c40f');
+  else showMsg('ПРОИГРЫШ', '#e74c3c');
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  update();
+  renderer.render(scene, camera);
+}
+animate();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
